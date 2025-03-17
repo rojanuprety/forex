@@ -6,6 +6,7 @@ import time
 import yfinance as yf
 from scipy.signal import find_peaks
 import numpy as np
+import os  # Added for environment variables
 
 # List of all major Forex pairs
 FOREX_PAIRS = [
@@ -57,9 +58,9 @@ def detect_m_pattern(data, ema, pair):
     return False, None
 
 def send_email_alert(pair, pattern_time):
-    sender_email = "rojan.uprety@gmail.com"
-    receiver_emails = ["rojan.uprety@gmail.com"]
-    app_password = "mxpfasjkofzmioev"
+    sender_email = os.getenv("EMAIL_ADDRESS")
+    receiver_emails = ["rojan.uprety@gmail.com","upramod9@gmail.com"]
+    app_password = os.getenv("EMAIL_PASSWORD")
 
     formatted_time = pattern_time.strftime("%y/%m/%d %H.%M.%S")
 
@@ -83,31 +84,20 @@ def send_email_alert(pair, pattern_time):
         print(f"Error sending email: {e}")
 
 def main():
-    last_alert_times = {}  # Track last alert time for each pair
-    
-    while True:
-        print("\nStarting new monitoring cycle...")
-        for pair in FOREX_PAIRS:
-            print(f"Checking {pair}...")
-            data = fetch_forex_data(pair)
-            if data is not None and not data.empty:
-                data['Datetime'] = pd.to_datetime(data['Datetime']).dt.tz_localize(None)
-                ema_200 = calculate_ema(data)
-                pattern_detected, pattern_time = detect_m_pattern(data, ema_200, pair)
-                
-                if pattern_detected:
-                    last_time = last_alert_times.get(pair, pd.Timestamp.min)
-                    if pattern_time > last_time:
-                        print(f"New M pattern detected for {pair}. Sending email...")
-                        send_email_alert(pair, pattern_time)
-                        last_alert_times[pair] = pattern_time
-                    else:
-                        print(f"Already alerted for {pair} at {last_alert_times[pair]}. Skipping.")
-            else:
-                print(f"No data fetched for {pair}.")
-        
-        print("Waiting for the next cycle...")
-        time.sleep(3600)  # 5 minutes between checks
+    print("\nStarting new monitoring cycle...")
+    for pair in FOREX_PAIRS:
+        print(f"Checking {pair}...")
+        data = fetch_forex_data(pair)
+        if data is not None and not data.empty:
+            data['Datetime'] = pd.to_datetime(data['Datetime']).dt.tz_localize(None)
+            ema_200 = calculate_ema(data)
+            pattern_detected, pattern_time = detect_m_pattern(data, ema_200, pair)
+            
+            if pattern_detected:
+                send_email_alert(pair, pattern_time)
+        else:
+            print(f"No data fetched for {pair}.")
+    print("Cycle complete")
 
 if __name__ == "__main__":
-    main()
+    main()  # Remove the infinite loop
