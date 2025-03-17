@@ -1,0 +1,32 @@
+name: Forex Pattern Alert System
+on:
+  schedule:
+    - cron: "*/15 * * * *"  # Runs every 15 minutes
+  push:
+    branches: [ "main" ]     # Run on code changes
+  workflow_dispatch:         # Allow manual triggers
+
+jobs:
+  detect-forex-patterns:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5       # Prevent hung runs
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run pattern detection
+      env:
+        EMAIL_ADDRESS: ${{ secrets.EMAIL_ADDRESS }}
+        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+      run: python forex_bot.py
