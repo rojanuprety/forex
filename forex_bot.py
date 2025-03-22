@@ -6,7 +6,9 @@ import time
 import yfinance as yf
 from scipy.signal import find_peaks
 import numpy as np
-import os  # Added for environment variables
+import os
+import json
+from datetime import datetime
 
 # List of all major Forex pairs
 FOREX_PAIRS = [
@@ -59,7 +61,7 @@ def detect_m_pattern(data, ema, pair):
 
 def send_email_alert(pair, pattern_time):
     sender_email = os.getenv("EMAIL_ADDRESS")
-    receiver_emails = ["rojan.uprety@gmail.com","upramod9@gmail.com"]
+    receiver_emails = ["rojan.uprety@gmail.com", "upramod9@gmail.com"]
     app_password = os.getenv("EMAIL_PASSWORD")
 
     formatted_time = pattern_time.strftime("%y/%m/%d %H.%M.%S")
@@ -83,7 +85,29 @@ def send_email_alert(pair, pattern_time):
     except Exception as e:
         print(f"Error sending email: {e}")
 
+def load_alert_log():
+    try:
+        with open('alerts_log.json', 'r') as f:
+            log_str = json.load(f)
+            log = {}
+            for pair, time_str in log_str.items():
+                log[pair] = datetime.fromisoformat(time_str)
+            return log
+    except FileNotFoundError:
+        return {}
+    except json.JSONDecodeError:
+        print("Warning: alerts_log.json is corrupted. Starting with empty log.")
+        return {}
+
+def save_alert_log(log):
+    log_str = {pair: time.isoformat() for pair, time in log.items()}
+    with open('alerts_log.json', 'w') as f:
+        json.dump(log_str, f)
+
 def main():
+    alert_log = load_alert_log()
+    updated = False
+
     print("\nStarting new monitoring cycle...")
     for pair in FOREX_PAIRS:
         print(f"Checking {pair}...")
@@ -94,10 +118,17 @@ def main():
             pattern_detected, pattern_time = detect_m_pattern(data, ema_200, pair)
             
             if pattern_detected:
-                send_email_alert(pair, pattern_time)
+                last_alert_time = alert_log.get(pair)
+                if last_alert_time is None or pattern_time > last_alert_time:
+                    send_email_alert(pair, pattern_time)
+                    alert_log[pair] = pattern_time
+                    updated = True
         else:
             print(f"No data fetched for {pair}.")
+    
+    if updated:
+        save_alert_log(alert_log)
     print("Cycle complete")
 
 if __name__ == "__main__":
-    main()  # Remove the infinite loop
+    main()
